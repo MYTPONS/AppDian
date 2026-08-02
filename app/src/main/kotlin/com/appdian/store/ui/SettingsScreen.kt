@@ -11,6 +11,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -21,6 +24,7 @@ import androidx.compose.material.icons.filled.Source
 import androidx.compose.material.icons.filled.Unarchive
 import androidx.compose.material.icons.filled.DeviceHub
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -44,8 +48,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.verticalScroll
 import android.content.Intent
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.appdian.store.vm.SettingsViewModel
+import com.appdian.store.vm.UpdateUiState
+import com.appdian.store.vm.UpdateViewModel
 
 /**
  * 设置页（第 5 个 tab）：集中管理
@@ -71,6 +78,8 @@ fun SettingsScreen(
     var showUa by remember { mutableStateOf(false) }
     var uaText by remember { mutableStateOf(viewModel.userAgent()) }
     var showCrashLog by remember { mutableStateOf(false) }
+    var showUpdate by remember { mutableStateOf(false) }
+    val updateVm: UpdateViewModel = viewModel(factory = viewModelFactory())
 
     Scaffold(
         topBar = {
@@ -117,6 +126,14 @@ fun SettingsScreen(
                 )
             }
             item { SectionLabel("关于") }
+            item {
+                SettingsEntry(
+                    icon = Icons.Default.SystemUpdate,
+                    title = "检查更新",
+                    subtitle = "从 GitHub 仓库检查新版本 APK",
+                    onClick = { showUpdate = true; updateVm.check() }
+                )
+            }
             item {
                 SettingsEntry(
                     icon = Icons.Default.Info,
@@ -222,6 +239,90 @@ fun SettingsScreen(
                 TextButton(onClick = { showUa = false }) { Text("取消") }
             }
         )
+    }
+
+    if (showUpdate) {
+        val updateUi by updateVm.ui.collectAsStateWithLifecycle()
+        when (val u = updateUi) {
+            is UpdateUiState.Checking -> {
+                AlertDialog(
+                    onDismissRequest = { showUpdate = false; updateVm.reset() },
+                    title = { Text("检查更新") },
+                    text = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            androidx.compose.material3.CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                            Spacer(Modifier.width(12.dp))
+                            Text("正在从 GitHub 检查新版本…")
+                        }
+                    },
+                    confirmButton = {}
+                )
+            }
+            is UpdateUiState.HasUpdate -> {
+                AlertDialog(
+                    onDismissRequest = { showUpdate = false; updateVm.reset() },
+                    title = { Text("发现新版本 ${u.info.version}") },
+                    text = {
+                        Column {
+                            Text(
+                                "当前版本：v${com.appdian.store.ui.APP_VERSION_NAME}\n最新版本：${u.info.version}",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            if (u.info.notes.isNotBlank()) {
+                                Spacer(Modifier.height(8.dp))
+                                Text(
+                                    u.info.notes,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.heightIn(max = 160.dp)
+                                        .verticalScroll(androidx.compose.foundation.rememberScrollState())
+                                )
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            runCatching {
+                                com.appdian.store.download.DownloadService.enqueue(
+                                    context,
+                                    u.info.apkUrl,
+                                    "应用大典 ${u.info.version}",
+                                    "appdian-${u.info.version}.apk",
+                                    appKey = "appdian-update"
+                                )
+                            }
+                            Toast.makeText(context, "已开始下载更新包", Toast.LENGTH_SHORT).show()
+                            showUpdate = false
+                            updateVm.reset()
+                        }) { Text("下载更新") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showUpdate = false; updateVm.reset() }) { Text("取消") }
+                    }
+                )
+            }
+            is UpdateUiState.NoUpdate -> {
+                AlertDialog(
+                    onDismissRequest = { showUpdate = false; updateVm.reset() },
+                    title = { Text("检查更新") },
+                    text = { Text("已是最新版本 v${com.appdian.store.ui.APP_VERSION_NAME}") },
+                    confirmButton = {
+                        TextButton(onClick = { showUpdate = false; updateVm.reset() }) { Text("知道了") }
+                    }
+                )
+            }
+            is UpdateUiState.Error -> {
+                AlertDialog(
+                    onDismissRequest = { showUpdate = false; updateVm.reset() },
+                    title = { Text("检查更新") },
+                    text = { Text(u.message, color = MaterialTheme.colorScheme.error) },
+                    confirmButton = {
+                        TextButton(onClick = { showUpdate = false; updateVm.reset() }) { Text("关闭") }
+                    }
+                )
+            }
+            is UpdateUiState.Idle -> {}
+        }
     }
 
     if (showCrashLog) {

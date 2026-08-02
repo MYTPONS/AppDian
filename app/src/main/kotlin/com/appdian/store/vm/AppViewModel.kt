@@ -306,4 +306,43 @@ class SourcesViewModel(
         }
 }
 
+// ---------------- 检查更新 ----------------
+
+sealed interface UpdateUiState {
+    data object Idle : UpdateUiState
+    data object Checking : UpdateUiState
+    data class HasUpdate(val info: com.appdian.store.data.UpdateInfo) : UpdateUiState
+    data object NoUpdate : UpdateUiState
+    data class Error(val message: String) : UpdateUiState
+}
+
+class UpdateViewModel(
+    private val checker: com.appdian.store.data.UpdateChecker
+) : ViewModel() {
+
+    private val _ui = MutableStateFlow<UpdateUiState>(UpdateUiState.Idle)
+    val ui: StateFlow<UpdateUiState> = _ui.asStateFlow()
+
+    /** 检查更新：查 GitHub latest release，与本地版本号比较 */
+    fun check() {
+        viewModelScope.launch {
+            _ui.value = UpdateUiState.Checking
+            val r = checker.check()
+            _ui.value = if (r.isSuccess) {
+                val info = r.getOrNull()
+                when {
+                    info == null -> UpdateUiState.Error("仓库还没有发布版本")
+                    com.appdian.store.data.UpdateChecker.isNewer(info.version, com.appdian.store.ui.APP_VERSION_NAME) ->
+                        UpdateUiState.HasUpdate(info)
+                    else -> UpdateUiState.NoUpdate
+                }
+            } else {
+                UpdateUiState.Error("检查失败：${r.exceptionOrNull()?.message ?: "网络异常"}")
+            }
+        }
+    }
+
+    fun reset() { _ui.value = UpdateUiState.Idle }
+}
+
 fun appViewModelFactory(app: AppDianApp) = AppViewModelFactory(app)
