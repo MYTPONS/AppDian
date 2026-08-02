@@ -24,7 +24,7 @@ class UpdateCheckerTest {
     fun setUp() {
         server = MockWebServer()
         server.start()
-        checker = UpdateChecker(apiUrl = server.url("/releases/latest").toString())
+        checker = UpdateChecker(apiUrl = server.url("/releases").toString())
     }
 
     @After
@@ -47,7 +47,7 @@ class UpdateCheckerTest {
 
     @Test
     fun `解析最新release得到版本号APK地址和说明`() {
-        val info = checker.parseRelease(releaseJson)
+        val info = checker.parseReleases("[" + releaseJson + "]")
         assertNotNull(info)
         assertEquals("v0.2.0", info!!.version)
         assertEquals(
@@ -60,13 +60,22 @@ class UpdateCheckerTest {
 
     @Test
     fun `无APK资源的release返回null`() {
-        val json = """{"tag_name":"v0.2.0","assets":[{"name":"notes.txt","browser_download_url":"https://x/notes.txt"}]}"""
-        assertNull(checker.parseRelease(json))
+        val json = """[{"tag_name":"v0.2.0","assets":[{"name":"notes.txt","browser_download_url":"https://x/notes.txt"}]}]"""
+        assertNull(checker.parseReleases(json))
     }
 
     @Test
     fun `check成功-有更新信息`() = runBlocking {
-        server.enqueue(MockResponse().setBody(releaseJson))
+        server.enqueue(MockResponse().setBody("[" + releaseJson + "]"))
+        val r = checker.check()
+        assertTrue(r.isSuccess)
+        assertEquals("v0.2.0", r.getOrNull()!!.version)
+    }
+
+    @Test
+    fun `check取第一个有APK的release忽略无APK的最新发布`() = runBlocking {
+        val noApk = """{"tag_name":"v5.0.0","assets":[{"name":"readme.txt","browser_download_url":"https://x/r"}]}"""
+        server.enqueue(MockResponse().setBody("[" + noApk + "," + releaseJson + "]"))
         val r = checker.check()
         assertTrue(r.isSuccess)
         assertEquals("v0.2.0", r.getOrNull()!!.version)

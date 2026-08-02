@@ -37,7 +37,10 @@ class UpdateChecker(
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(25, TimeUnit.SECONDS)
         .build(),
-    private val apiUrl: String = "$GITHUB_REPO_API/releases/latest"
+    // 注意：不用 /releases/latest，那个端点只返回【最新非 prerelease】发布，
+    // 而本项目的测试版发布都被标记为 prerelease，会导致永远查不到更新。
+    // 改为拉取 /releases 列表（含 prerelease），自己取最新一条。
+    private val apiUrl: String = "$GITHUB_REPO_API/releases?per_page=3"
 ) {
 
     suspend fun check(): Result<UpdateInfo?> = withContext(Dispatchers.IO) {
@@ -52,28 +55,35 @@ class UpdateChecker(
                     !resp.isSuccessful -> throw IOException("HTTP ${resp.code}")
                     else -> {
                         val body = resp.body?.string() ?: return@use null
-                        parseRelease(body)
+                        parseReleases(body)
                     }
                 }
             }
         }
     }
 
-    /** 解析 GitHub latest release JSON；找不到 APK asset 返回 null */
-    internal fun parseRelease(json: String): UpdateInfo? {
-        val release = runCatching {
-            Json { ignoreUnknownKeys = true }.decodeFromString<ReleaseJson>(json)
+    /**
+     * 解析 GitHub /releases 列表 JSON（数组，按发布时间降序）。
+     * 取第一个带 APK asset 的发布（即最新一个含 APK 的版本，不论是否 prerelease），
+     * 找不到返回 null。
+     */
+    internal fun parseReleases(json: String): UpdateInfo? {
+        val list = runCatching {
+            Json { ignoreUnknownKeys = true }.decodeFromString<List<ReleaseJson>>(json)
         }.getOrNull() ?: return null
-        val apk = release.assets
-            .firstOrNull { it.name.lowercase().endsWith(".apk") }
-            ?.browser_download_url?.takeIf { it.isNotBlank() }
-            ?: return null
-        return UpdateInfo(
-            version = release.tag_name,
-            apkUrl = apk,
-            notes = release.body.orEmpty(),
-            publishedAt = release.published_at.orEmpty()
-        )
+        for (release in list) {
+            val apk = release.assets
+                .firstOrNull { it.name.lowercase().endsWith(".apk") }
+                ?.browser_download_url?.takeIf { it.isNotBlank() }
+                ?: continue
+            return UpdateInfo(
+                version = release.tag_name,
+                apkUrl = apk,
+                notes = release.body.orEmpty(),
+                publishedAt = release.published_at.orEmpty()
+            )
+        }
+        return null
     }
 
     companion object {

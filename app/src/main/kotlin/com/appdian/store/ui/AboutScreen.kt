@@ -41,7 +41,7 @@ const val GITHUB_REPO_URL = "https://github.com/MYTPONS/AppDian"
 const val GITHUB_REPO_API = "https://api.github.com/repos/MYTPONS/AppDian"
 
 /** 版本信息（与 app/build.gradle.kts 的 versionName 保持一致） */
-const val APP_VERSION_NAME = "0.2.0"
+const val APP_VERSION_NAME = "0.2.1"
 
 /**
  * 关于页：项目详细介绍 + 开源信息（仓库 / License / 作者 / 技术栈 / 内置源）。
