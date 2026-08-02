@@ -85,7 +85,15 @@ object DownloadHub {
         sourceName: String? = null,
         version: String? = null
     ): Long {
-        if (appKey != null && hasRecord(appKey)) return -1L
+        if (appKey != null) {
+            val existing = _tasks.value.firstOrNull { it.appKey == appKey }
+            if (existing != null) {
+                // 失败/已取消的任务允许重新入队下载；进行中/暂停/已完成则去重
+                if (existing.status != DlStatus.FAILED && existing.status != DlStatus.CANCELED) return -1L
+                _tasks.value = _tasks.value.filterNot { it.id == existing.id }
+                _queue.removeAll { it == existing.id }
+            }
+        }
         val id = idCounter.incrementAndGet()
         _tasks.value = listOf(
             DownloadTask(

@@ -141,9 +141,21 @@ class StoreRepository(
             preferOnlineTitle: Boolean
         ): GroupResult {
             if (existing == null) return g.copy(items = kept)
-            val all = (existing.items + kept).distinctBy { dedupKey(it) }
+            val all = pickOnePerKey(existing.items + kept, ::dedupKey)
             val base = if (preferOnlineTitle) g else existing
             return base.copy(items = all)
+        }
+
+        /**
+         * 按 key 去重，每组优先保留有图标的条目（图标更全/更可信），
+         * 否则保留组内第一个，整体保持原相对顺序。
+         */
+        fun pickOnePerKey(items: List<AppItem>, key: (AppItem) -> String): List<AppItem> {
+            val grouped = LinkedHashMap<String, MutableList<AppItem>>()
+            for (it in items) grouped.getOrPut(key(it)) { mutableListOf() }.add(it)
+            return grouped.values.map { g ->
+                g.firstOrNull { !it.icon.isNullOrBlank() } ?: g.first()
+            }
         }
     }
 
@@ -284,12 +296,10 @@ class StoreRepository(
 
     /**
      * 搜索去重：同名同版本的条目只保留一个（不同网站/榜单会重复收录同一软件）。
-     * 保留顺序中的第一个，等价于“随机保留一个”。
+     * 保留顺序：优先选有应用图标的条目，否则保留第一个。
      */
     private fun dedupByNameAndVersion(items: List<AppItem>): List<AppItem> =
-        items.distinctBy { item ->
-            (item.name.trim().lowercase() + "|" + (item.version?.trim() ?: "")).lowercase()
-        }
+        pickOnePerKey(items, ::dedupKey)
 
     private fun itemVars(item: AppItem): Map<String, String> = buildMap {
         item.name.let { if (it.isNotBlank()) put("name", it) }

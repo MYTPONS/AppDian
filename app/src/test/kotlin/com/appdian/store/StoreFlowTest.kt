@@ -178,4 +178,33 @@ class StoreFlowTest {
         val names = received[0].items.map { it.name + "@" + it.version }
         assertEquals(listOf("抖音@30.5.0", "抖音@30.4.0", "抖音极速版@30.5.0"), names)
     }
+
+    @Test
+    fun `搜索同名同版本去重-优先保留有图标的条目`() = runBlocking {
+        val dup = """
+        <html><body>
+            <div class='app'><span class='n'>抖音</span><span class='v'>30.5.0</span></div>
+            <div class='app'><span class='n'>抖音</span><span class='v'>30.5.0</span><img class='i' src='https://x.com/icon.png'></div>
+            <div class='app'><span class='n'>抖音</span><span class='v'>30.4.0</span></div>
+        </body></html>
+        """.trimIndent()
+        server.enqueue(MockResponse().setBody(dup))
+
+        val src = AppSource(
+            sourceName = "S", sourceUrl = base,
+            search = AppSection(
+                url = "/search?q={{key}}",
+                listRule = "css:div.app",
+                itemRules = ItemRules(
+                    name = "css:.n@text",
+                    version = "css:.v@text",
+                    icon = "css:img.i@attr:src"
+                )
+            )
+        )
+        val repo = StoreRepository(HttpFetcher(), sources = { listOf(src) })
+        val received = repo.searchFlow("抖音").toList()
+        val kept = received[0].items.first { it.version == "30.5.0" }
+        assertEquals("https://x.com/icon.png", kept.icon)
+    }
 }

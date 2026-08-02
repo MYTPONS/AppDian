@@ -318,16 +318,21 @@ fun SettingsScreen(
                     },
                     confirmButton = {
                         TextButton(onClick = {
-                            runCatching {
+                            val id = runCatching {
                                 com.appdian.store.download.DownloadService.enqueue(
                                     context,
                                     u.info.apkUrl,
                                     "应用大典 ${u.info.version}",
                                     "appdian-${u.info.version}.apk",
-                                    appKey = "appdian-update"
+                                    appKey = "appdian-update-${u.info.version}"
                                 )
-                            }
-                            Toast.makeText(context, "已开始下载更新包", Toast.LENGTH_SHORT).show()
+                            }.getOrElse { -1L }
+                            Toast.makeText(
+                                context,
+                                if (id > 0) "已开始下载更新包，可在下载页查看"
+                                else "该版本更新包已在下载/已存在，请到下载页查看",
+                                Toast.LENGTH_SHORT
+                            ).show()
                             showUpdate = false
                             updateVm.reset()
                         }) { Text("下载更新") }
