@@ -40,6 +40,7 @@ import com.appdian.store.ui.DownloadsScreen
 import com.appdian.store.ui.DetailScreen
 import com.appdian.store.ui.DiscoveryScreen
 import com.appdian.store.ui.SearchScreen
+import com.appdian.store.ui.AboutScreen
 import com.appdian.store.ui.SettingsScreen
 import com.appdian.store.ui.SourcesScreen
 import com.appdian.store.ui.viewModelFactory
@@ -170,10 +171,12 @@ private fun AppRoot() {
                         runCatching { nav.navigate("sourceManage") }
                     },
                     onOpenBatchCategorize = { runCatching { nav.navigate("batchCategorize") } },
-                    onOpenCategoryManage = { runCatching { nav.navigate("categoryManage") } }
+                    onOpenCategoryManage = { runCatching { nav.navigate("categoryManage") } },
+                    onOpenAbout = { runCatching { nav.navigate("about") } }
                 )
             }
             composable("sourceManage") { SourcesScreen(onBack = { nav.popBackStack() }) }
+            composable("about") { AboutScreen(onBack = { nav.popBackStack() }) }
             composable("batchCategorize") {
                 BatchCategorizeScreen(onBack = { nav.popBackStack() })
             }

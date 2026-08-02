@@ -60,6 +60,7 @@ fun SettingsScreen(
     onOpenSources: () -> Unit,
     onOpenBatchCategorize: () -> Unit,
     onOpenCategoryManage: () -> Unit,
+    onOpenAbout: () -> Unit,
     viewModel: SettingsViewModel = viewModel(factory = viewModelFactory())
 ) {
     val context = LocalContext.current
@@ -113,6 +114,15 @@ fun SettingsScreen(
                     title = "User-Agent（用户代理）",
                     subtitle = "全局默认 UA：源没配 UA 时抓取和下载都使用它",
                     onClick = { uaText = viewModel.userAgent(); showUa = true }
+                )
+            }
+            item { SectionLabel("关于") }
+            item {
+                SettingsEntry(
+                    icon = Icons.Default.Info,
+                    title = "关于应用大典",
+                    subtitle = "项目介绍 · 开源信息 · 功能特性",
+                    onClick = onOpenAbout
                 )
             }
             item { SectionLabel("帮助与诊断") }
