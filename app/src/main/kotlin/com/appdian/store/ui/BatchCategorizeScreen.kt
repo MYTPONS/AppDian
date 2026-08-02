@@ -75,9 +75,8 @@ fun BatchCategorizeScreen(
     var query by remember { mutableStateOf("") }
     var categoryFilter by remember { mutableStateOf<String?>(null) }   // null = 全部
     val selected = remember { SelectedState() }
-
-    // 每次进入页面都刷新一遍最新条目
-    LaunchedEffect(Unit) { viewModel.refresh() }
+    // 把勾选集合作为 Compose 可观察状态：点击后能触发重组刷新勾选框
+    val selectedKeys by selected.keysFlow.collectAsStateWithLifecycle()
 
     // 本地过滤：关键词（名称/摘要/来源）+ 分类
     val filtered = remember(ui.entries, query, categoryFilter) {
@@ -92,6 +91,14 @@ fun BatchCategorizeScreen(
         }.sortedBy { it.item.name }
     }
 
+    // 勾选中的应用条目（用于批量归类）
+    val pickEntries = remember(filtered, selectedKeys) {
+        filtered.filter { stableKey(it) in selectedKeys }
+    }
+
+    // 每次进入页面都刷新一遍最新条目
+    LaunchedEffect(Unit) { viewModel.refresh() }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -104,7 +111,7 @@ fun BatchCategorizeScreen(
             )
         },
         bottomBar = {
-            if (selected.count() > 0) {
+            if (selectedKeys.isNotEmpty()) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -112,14 +119,14 @@ fun BatchCategorizeScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        "已选 ${selected.count()} 项",
+                        "已选 ${selectedKeys.size} 项",
                         style = MaterialTheme.typography.titleSmall,
                         modifier = Modifier.weight(1f)
                     )
                     TextButton(onClick = { selected.clear() }) { Text("清空") }
                     TextButton(
                         onClick = {
-                            val keys = selected.keys()
+                            val keys = pickEntries
                             selected.clear()
                             viewModel.setOverrides(keys, null)
                             android.widget.Toast.makeText(context, "已恢复自动判定", android.widget.Toast.LENGTH_SHORT).show()
@@ -195,8 +202,8 @@ fun BatchCategorizeScreen(
                     items(filtered, key = { CategoryClassifier.itemKey(it.source.sourceName, it.item) + "-" + it.item.detailUrl }) { e ->
                         BatchRow(
                             entry = e,
-                            checked = selected.isSelected(e),
-                            onClick = { selected.toggle(e) }
+                            checked = stableKey(e) in selectedKeys,
+                            onClick = { selected.toggle(stableKey(e)) }
                         )
                     }
                 }
@@ -205,7 +212,7 @@ fun BatchCategorizeScreen(
     }
 
     if (selected.showPicker) {
-        val keys = selected.keys()
+        val keys = pickEntries
         AlertDialog(
             onDismissRequest = { selected.showPicker = false },
             title = { Text("归类到（${keys.size} 项）") },
@@ -254,20 +261,16 @@ fun BatchCategorizeScreen(
 private fun stableKey(e: CategorizedEntry): String =
     CategoryClassifier.itemKey(e.source.sourceName, e.item) + "|" + (e.item.detailUrl ?: "")
 
-/** 多选状态，用稳定键判勾选（不依赖对象引用） */
+/** 多选状态：存稳定键集合；keysFlow 由界面收集以驱动勾选刷新 */
 private class SelectedState {
-    private val _keys = MutableStateFlow<List<CategorizedEntry>>(emptyList())
-    val keysFlow: StateFlow<List<CategorizedEntry>> = _keys.asStateFlow()
+    private val _keys = MutableStateFlow<Set<String>>(emptySet())
+    val keysFlow: StateFlow<Set<String>> = _keys.asStateFlow()
     var showPicker by mutableStateOf(false)
 
-    fun toggle(e: CategorizedEntry) {
-        val sk = stableKey(e)
-        _keys.update { l -> if (l.any { stableKey(it) == sk }) l.filterNot { stableKey(it) == sk } else l + e }
+    fun toggle(key: String) {
+        _keys.update { if (key in it) it - key else it + key }
     }
-    fun isSelected(e: CategorizedEntry): Boolean = stableKey(e) in _keys.value.map { stableKey(it) }
-    fun count(): Int = _keys.value.size
-    fun keys(): List<CategorizedEntry> = _keys.value
-    fun clear() { _keys.value = emptyList() }
+    fun clear() { _keys.value = emptySet() }
 }
 
 @Composable
