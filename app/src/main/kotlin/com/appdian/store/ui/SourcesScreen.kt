@@ -25,6 +25,8 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.OutlinedButton
+import kotlinx.coroutines.launch
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -58,6 +60,7 @@ fun SourcesScreen(
 ) {
     val ui by viewModel.ui.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
     androidx.compose.runtime.LaunchedEffect(Unit) {
         (context.applicationContext as com.appdian.store.AppDianApp).logEvent("进入源管理页")
     }
@@ -65,6 +68,26 @@ fun SourcesScreen(
     var showImportDialog by remember { mutableStateOf(false) }
     var rawText by remember { mutableStateOf("") }
     var confirmDelete by remember { mutableStateOf<String?>(null) }
+    // 网络导入
+    var showNetImportDialog by remember { mutableStateOf(false) }
+    var netUrl by remember { mutableStateOf("") }
+    var netError by remember { mutableStateOf<String?>(null) }
+    var netLoading by remember { mutableStateOf(false) }
+
+    // 本地文件导入（系统文件选择器）
+    val importFileLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            val text = ImportExport.readUriText(context, uri)
+            if (text == null) {
+                android.widget.Toast.makeText(context, "读取文件失败", android.widget.Toast.LENGTH_SHORT).show()
+            } else {
+                viewModel.import(text)
+                showImportDialog = false
+            }
+        }
+    }
 
     androidx.compose.material3.Scaffold(
         topBar = {
@@ -178,19 +201,35 @@ fun SourcesScreen(
             title = { Text("导入应用源") },
             text = {
                 Column {
+                    Text(
+                        "选择导入方式：",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        OutlinedButton(
+                            onClick = { importFileLauncher.launch(arrayOf("*/*")) },
+                            modifier = Modifier.weight(1f)
+                        ) { Text("本地文件") }
+                        OutlinedButton(
+                            onClick = { showNetImportDialog = true },
+                            modifier = Modifier.weight(1f)
+                        ) { Text("网络导入") }
+                    }
+                    Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
                         value = rawText,
                         onValueChange = { rawText = it },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(280.dp),
+                            .height(220.dp),
                         placeholder = {
-                            Text("粘贴 JSON 源内容，例如 F-Droid 源：\n{ \"sourceName\": \"...\", \"sourceUrl\": \"...\", ... }")
+                            Text("或直接粘贴 JSON 源内容，例如 F-Droid 源：\n{ \"sourceName\": \"...\", \"sourceUrl\": \"...\", ... }")
                         },
                         textStyle = MaterialTheme.typography.bodySmall
                     )
                     Text(
-                        "提示：可从朋友分享、GitHub 等渠道获取源 JSON。",
+                        "可从朋友分享、GitHub 等渠道获取源 JSON，也支持从本地 .json 文件或网络 URL 导入。",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.outline,
                         modifier = Modifier.padding(top = 8.dp)
@@ -206,6 +245,51 @@ fun SourcesScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showImportDialog = false; rawText = "" }) { Text("取消") }
+            }
+        )
+    }
+
+    // 网络导入对话框
+    if (showNetImportDialog) {
+        AlertDialog(
+            onDismissRequest = { showNetImportDialog = false; netUrl = ""; netError = null },
+            title = { Text("从网络导入") },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = netUrl,
+                        onValueChange = { netUrl = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("输入源 JSON 直链，如 https://example.com/source.json") },
+                        singleLine = true
+                    )
+                    netError?.let {
+                        Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp))
+                    }
+                    if (netLoading) {
+                        Text("下载中…", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline, modifier = Modifier.padding(top = 6.dp))
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (netUrl.isBlank()) return@TextButton
+                    netLoading = true; netError = null
+                    scope.launch {
+                        try {
+                            val text = ImportExport.fetchText(netUrl.trim())
+                            viewModel.import(text)
+                            showNetImportDialog = false; netUrl = ""; netLoading = false
+                            showImportDialog = false
+                        } catch (e: Exception) {
+                            netLoading = false
+                            netError = e.message ?: "下载失败"
+                        }
+                    }
+                }, enabled = netUrl.isNotBlank() && !netLoading) { Text("下载并导入") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showNetImportDialog = false; netUrl = ""; netError = null }) { Text("取消") }
             }
         )
     }

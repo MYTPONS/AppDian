@@ -108,10 +108,37 @@ object DownloadHub {
         update(id) { it.copy(status = DlStatus.CANCELED, error = "已取消") }
     }
 
-    fun remove(id: Long) {
+    fun remove(id: Long, deleteFile: Boolean = false) {
+        val t = _tasks.value.firstOrNull { it.id == id }
         running.remove(id)?.cancel()
         _tasks.value = _tasks.value.filterNot { it.id == id }
+        if (deleteFile) t?.let { deleteLocalFile(it) }
         persist()
+    }
+
+    /** 批量删除任务记录；[deleteFile] 时同时删除各自已下载的文件 */
+    fun removeAll(ids: List<Long>, deleteFile: Boolean = false) {
+        val targets = _tasks.value.filter { it.id in ids }
+        ids.forEach { running.remove(it)?.cancel() }
+        _tasks.value = _tasks.value.filterNot { it.id in ids }
+        if (deleteFile) targets.forEach { deleteLocalFile(it) }
+        persist()
+    }
+
+    /** 删除任务对应的本地已下载文件（API29+ 走 MediaStore，低版本走文件路径） */
+    fun deleteLocalFile(task: DownloadTask) {
+        val path = task.localPath ?: return
+        val ctx = appContext ?: return
+        if (Build.VERSION.SDK_INT >= 29) {
+            // localPath 保存的是 MediaStore 的 displayName
+            ctx.contentResolver.delete(
+                MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                "${MediaStore.MediaColumns.DISPLAY_NAME}=? AND ${MediaStore.MediaColumns.RELATIVE_PATH}=?",
+                arrayOf(path, Environment.DIRECTORY_DOWNLOADS + "/应用大典")
+            )
+        } else {
+            runCatching { File(path).delete() }
+        }
     }
 
     /** 换源重试：更新任务（换 URL/Referer 等）后重新入队，进度清零 */

@@ -1,16 +1,20 @@
 package com.appdian.store
 
 import android.app.Application
+import coil.ImageLoader
+import coil.ImageLoaderFactory
 import com.appdian.store.data.CategoryRepository
 import com.appdian.store.data.SettingsStore
 import com.appdian.store.data.SourceRepository
 import com.appdian.store.data.StoreRepository
 import com.appdian.store.download.DownloadService
 import com.appdian.store.net.HttpFetcher
+import okhttp3.OkHttpClient
 import java.io.File
+import java.util.concurrent.TimeUnit
 
 /** 应用容器：手动依赖注入（避免引入 Hilt/Koin 的复杂度） */
-class AppDianApp : Application() {
+class AppDianApp : Application(), ImageLoaderFactory {
 
     lateinit var storeRepository: StoreRepository
         private set
@@ -20,6 +24,22 @@ class AppDianApp : Application() {
         private set
     lateinit var settingsStore: SettingsStore
         private set
+
+    /**
+     * 全局图片加载器：带浏览器 UA 的 OkHttp 客户端。
+     * 部分源站（如华军）对无 UA / 非浏览器 UA 的图片请求可能拦截，
+     * 统一用浏览器 UA 提升图标加载成功率。
+     */
+    override fun newImageLoader(): ImageLoader =
+        ImageLoader.Builder(this)
+            .okHttpClient(
+                OkHttpClient.Builder()
+                    .connectTimeout(15, TimeUnit.SECONDS)
+                    .readTimeout(25, TimeUnit.SECONDS)
+                    .build()
+            )
+            .crossfade(true)
+            .build()
 
     override fun onCreate() {
         super.onCreate()

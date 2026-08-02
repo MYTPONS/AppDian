@@ -18,5 +18,18 @@ class DownloadsViewModel : ViewModel() {
         DownloadService.start(context)
     }
 
-    fun remove(id: Long) = DownloadHub.remove(id)
+    /** 删除任务记录；[deleteFile] 时同时删除已下载的本地文件 */
+    fun remove(id: Long, deleteFile: Boolean = false) = DownloadHub.remove(id, deleteFile)
+
+    /** 批量删除；[deleteFile] 时同时删除各自已下载的本地文件 */
+    fun removeAll(ids: List<Long>, deleteFile: Boolean = false) = DownloadHub.removeAll(ids, deleteFile)
+
+    /** 批量取消（不影响已下载文件） */
+    fun cancelAll(ids: List<Long>) = ids.forEach { DownloadHub.cancel(it) }
+
+    /** 批量重试（重新入队） */
+    fun retryAll(context: Context, ids: List<Long>) {
+        ids.forEach { DownloadHub.retry(it) }
+        DownloadService.start(context)
+    }
 }

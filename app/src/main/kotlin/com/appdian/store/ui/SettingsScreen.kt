@@ -2,6 +2,7 @@ package com.appdian.store.ui
 
 import android.widget.Toast
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.PaddingValues
@@ -53,6 +54,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.appdian.store.vm.SettingsViewModel
 import com.appdian.store.vm.UpdateUiState
 import com.appdian.store.vm.UpdateViewModel
+import kotlinx.coroutines.launch
 
 /**
  * 设置页（第 5 个 tab）：集中管理
@@ -79,7 +81,38 @@ fun SettingsScreen(
     var uaText by remember { mutableStateOf(viewModel.userAgent()) }
     var showCrashLog by remember { mutableStateOf(false) }
     var showUpdate by remember { mutableStateOf(false) }
+    var showNetImportCfg by remember { mutableStateOf(false) }
+    var netCfgUrl by remember { mutableStateOf("") }
+    var netCfgError by remember { mutableStateOf<String?>(null) }
+    var netCfgLoading by remember { mutableStateOf(false) }
     val updateVm: UpdateViewModel = viewModel(factory = viewModelFactory())
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+
+    // 导出到本地文件 / 从本地文件导入 / 从网络导入（legado 式）
+    val exportFileLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        if (uri != null && ImportExport.writeUriText(context, uri, viewModel.exportConfig())) {
+            Toast.makeText(context, "已保存到文件", Toast.LENGTH_SHORT).show()
+            showExport = false
+        }
+    }
+    val importFileLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            val text = ImportExport.readUriText(context, uri)
+            if (text == null) {
+                Toast.makeText(context, "读取文件失败", Toast.LENGTH_SHORT).show()
+            } else {
+                val err = viewModel.importConfig(text)
+                if (err == null) {
+                    Toast.makeText(context, "导入成功", Toast.LENGTH_SHORT).show()
+                    showImport = false
+                } else Toast.makeText(context, "导入失败：$err", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -191,15 +224,18 @@ fun SettingsScreen(
                 }
             },
             confirmButton = {
-                TextButton(onClick = {
-                    runCatching {
-                        val cm = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
-                                as android.content.ClipboardManager
-                        cm.setPrimaryClip(android.content.ClipData.newPlainText("分类配置", cfg))
-                    }
-                    Toast.makeText(context, "已复制到剪贴板", Toast.LENGTH_SHORT).show()
-                    showExport = false
-                }) { Text("复制") }
+                Row {
+                    TextButton(onClick = { exportFileLauncher.launch("appdian-categories.json") }) { Text("保存到文件") }
+                    TextButton(onClick = {
+                        runCatching {
+                            val cm = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
+                                    as android.content.ClipboardManager
+                            cm.setPrimaryClip(android.content.ClipData.newPlainText("分类配置", cfg))
+                        }
+                        Toast.makeText(context, "已复制到剪贴板", Toast.LENGTH_SHORT).show()
+                        showExport = false
+                    }) { Text("复制") }
+                }
             },
             dismissButton = {
                 TextButton(onClick = { showExport = false }) { Text("关闭") }
@@ -381,11 +417,27 @@ fun SettingsScreen(
             title = { Text("导入分类配置") },
             text = {
                 Column {
+                    Text(
+                        "选择导入方式：",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        androidx.compose.material3.OutlinedButton(
+                            onClick = { importFileLauncher.launch(arrayOf("*/*")) },
+                            modifier = Modifier.weight(1f)
+                        ) { Text("本地文件") }
+                        androidx.compose.material3.OutlinedButton(
+                            onClick = { showNetImportCfg = true },
+                            modifier = Modifier.weight(1f)
+                        ) { Text("网络导入") }
+                    }
+                    Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
                         value = importText,
                         onValueChange = { importText = it; importMsg = null },
-                        placeholder = { Text("粘贴 JSON") },
-                        minLines = 6,
+                        placeholder = { Text("或直接粘贴 JSON") },
+                        minLines = 5,
                         modifier = Modifier.fillMaxWidth()
                     )
                     importMsg?.let {
@@ -412,6 +464,57 @@ fun SettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showImport = false }) { Text("取消") }
+            }
+        )
+    }
+
+    // 网络导入分类配置
+    if (showNetImportCfg) {
+        AlertDialog(
+            onDismissRequest = { showNetImportCfg = false; netCfgUrl = ""; netCfgError = null },
+            title = { Text("从网络导入分类配置") },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = netCfgUrl,
+                        onValueChange = { netCfgUrl = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("输入分类配置 JSON 直链") },
+                        singleLine = true
+                    )
+                    netCfgError?.let {
+                        Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp))
+                    }
+                    if (netCfgLoading) {
+                        Text("下载中…", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline, modifier = Modifier.padding(top = 6.dp))
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (netCfgUrl.isBlank()) return@TextButton
+                    netCfgLoading = true; netCfgError = null
+                    scope.launch {
+                        try {
+                            val text = ImportExport.fetchText(netCfgUrl.trim())
+                            val err = viewModel.importConfig(text)
+                            if (err == null) {
+                                Toast.makeText(context, "导入成功", Toast.LENGTH_SHORT).show()
+                                showNetImportCfg = false; netCfgUrl = ""; netCfgLoading = false
+                                showImport = false
+                            } else {
+                                netCfgLoading = false
+                                netCfgError = "导入失败：$err"
+                            }
+                        } catch (e: Exception) {
+                            netCfgLoading = false
+                            netCfgError = e.message ?: "下载失败"
+                        }
+                    }
+                }, enabled = netCfgUrl.isNotBlank() && !netCfgLoading) { Text("下载并导入") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showNetImportCfg = false; netCfgUrl = ""; netCfgError = null }) { Text("取消") }
             }
         )
     }

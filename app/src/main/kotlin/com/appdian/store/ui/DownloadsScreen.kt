@@ -19,21 +19,29 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.SelectAll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.rememberCoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,7 +54,14 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.appdian.store.download.DlStatus
 import com.appdian.store.download.DownloadTask
 import com.appdian.store.vm.DownloadsViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
+/** 待删除的任务集合（单个或批量），统一弹一次确认 */
+private data class DeletePending(val ids: List<Long>, val hasFile: Boolean)
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DownloadsScreen(
     viewModel: DownloadsViewModel = viewModel(factory = viewModelFactory())
@@ -55,51 +70,161 @@ fun DownloadsScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    if (tasks.isEmpty()) {
-        Column(
-            modifier = Modifier.fillMaxSize().padding(32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Text(
-                "还没有下载记录\n在应用详情页点「下载」开始吧",
-                textAlign = TextAlign.Center,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+    // 批量管理模式
+    var batchMode by remember { mutableStateOf(false) }
+    var selectedIds by remember { mutableStateOf(setOf<Long>()) }
+    // 删除确认（单个或批量共用一个，只弹一次）
+    var pendingDelete by remember { mutableStateOf<DeletePending?>(null) }
+
+    fun hasFile(t: DownloadTask) = t.status == DlStatus.DONE && !t.localPath.isNullOrBlank()
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(if (batchMode) "已选 ${selectedIds.size} 项" else "下载") },
+                actions = {
+                    if (batchMode) {
+                        TextButton(onClick = { batchMode = false; selectedIds = emptySet() }) { Text("完成") }
+                    } else {
+                        IconButton(onClick = { batchMode = true }) {
+                            Icon(Icons.Default.Checklist, contentDescription = "批量管理")
+                        }
+                    }
+                }
             )
+        },
+        bottomBar = {
+            if (batchMode) {
+                Surface(tonalElevation = 3.dp) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TextButton(
+                            onClick = {
+                                selectedIds = if (selectedIds.size == tasks.size) emptySet()
+                                else tasks.map { it.id }.toSet()
+                            }
+                        ) { Text(if (selectedIds.size == tasks.size) "取消全选" else "全选") }
+                        Spacer(Modifier.weight(1f))
+                        TextButton(
+                            onClick = {
+                                val ids = tasks.filter { it.status == DlStatus.QUEUED || it.status == DlStatus.RUNNING }
+                                    .map { it.id }.toList()
+                                if (ids.isNotEmpty()) { viewModel.cancelAll(ids); selectedIds = selectedIds - ids.toSet() }
+                            },
+                            enabled = tasks.any { it.status == DlStatus.QUEUED || it.status == DlStatus.RUNNING }
+                        ) { Text("取消") }
+                        TextButton(
+                            onClick = {
+                                val ids = tasks.filter { it.status == DlStatus.FAILED }.map { it.id }.toList()
+                                if (ids.isNotEmpty()) { viewModel.retryAll(context, ids); selectedIds = selectedIds - ids.toSet() }
+                            },
+                            enabled = tasks.any { it.status == DlStatus.FAILED }
+                        ) { Text("重试") }
+                        TextButton(onClick = {
+                            val ids = selectedIds.toList()
+                            if (ids.isNotEmpty()) {
+                                pendingDelete = DeletePending(
+                                    ids,
+                                    tasks.any { it.id in ids && hasFile(it) }
+                                )
+                            }
+                        }) {
+                            Text("删除", color = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                }
+            }
         }
-    } else {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
-        ) {
-            items(tasks, key = { it.id }) { task ->
-                DownloadTaskRow(
-                    task = task,
-                    onCancel = { viewModel.cancel(task.id) },
-                    onRetry = { viewModel.retry(context, task.id) },
-                    onDelete = { viewModel.remove(task.id) },
-                    onInstall = {
-                        // 复制到 cacheDir 可能耗时长（大 APK），放后台线程
-                        scope.launch(Dispatchers.IO) {
-                            runCatching {
-                                com.appdian.store.download.InstallUtil.installApk(context, task.localPath!!)
-                            }.onFailure {
-                                withContext(Dispatchers.Main) {
-                                    android.widget.Toast.makeText(context, "无法安装：${it.message}", android.widget.Toast.LENGTH_LONG).show()
+    ) { padding ->
+        if (tasks.isEmpty()) {
+            Column(
+                modifier = Modifier.fillMaxSize().padding(padding).padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    "还没有下载记录\n在应用详情页点「下载」开始吧",
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().padding(padding),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                items(tasks, key = { it.id }) { task ->
+                    DownloadTaskRow(
+                        task = task,
+                        batchMode = batchMode,
+                        checked = task.id in selectedIds,
+                        onToggle = {
+                            selectedIds = if (task.id in selectedIds) selectedIds - task.id
+                            else selectedIds + task.id
+                        },
+                        onCancel = { viewModel.cancel(task.id) },
+                        onRetry = { viewModel.retry(context, task.id) },
+                        onDelete = {
+                            pendingDelete = DeletePending(listOf(task.id), hasFile(task))
+                        },
+                        onInstall = {
+                            // 复制到 cacheDir 可能耗时长（大 APK），放后台线程
+                            scope.launch(Dispatchers.IO) {
+                                runCatching {
+                                    com.appdian.store.download.InstallUtil.installApk(context, task.localPath!!)
+                                }.onFailure {
+                                    withContext(Dispatchers.Main) {
+                                        android.widget.Toast.makeText(context, "无法安装：${it.message}", android.widget.Toast.LENGTH_LONG).show()
+                                    }
                                 }
                             }
                         }
-                    }
-                )
+                    )
+                }
             }
         }
+    }
+
+    // 删除确认弹窗（单个/批量共用，只弹一次）
+    pendingDelete?.let { p ->
+        val hasFile = p.hasFile
+        AlertDialog(
+            onDismissRequest = { pendingDelete = null },
+            title = { Text(if (p.ids.size > 1) "删除 ${p.ids.size} 条下载记录？" else "删除这条下载记录？") },
+            text = {
+                Text(
+                    if (hasFile) "是否同时删除已下载的安装包文件？"
+                    else "该任务没有已下载的文件，仅删除记录。"
+                )
+            },
+            confirmButton = {
+                if (hasFile) {
+                    TextButton(onClick = {
+                        viewModel.removeAll(p.ids, deleteFile = true)
+                        pendingDelete = null
+                    }) { Text("同时删除文件", color = MaterialTheme.colorScheme.error) }
+                }
+                TextButton(onClick = {
+                    viewModel.removeAll(p.ids, deleteFile = false)
+                    pendingDelete = null
+                }) { Text(if (hasFile) "仅删除记录" else "删除") }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDelete = null }) { Text("取消") }
+            }
+        )
     }
 }
 
 @Composable
 private fun DownloadTaskRow(
     task: DownloadTask,
+    batchMode: Boolean,
+    checked: Boolean,
+    onToggle: () -> Unit,
     onCancel: () -> Unit,
     onRetry: () -> Unit,
     onDelete: () -> Unit,
@@ -110,16 +235,44 @@ private fun DownloadTaskRow(
             .fillMaxWidth()
             .padding(vertical = 4.dp)
             .let { m ->
-                if (task.status == DlStatus.DONE) m.clip(RoundedCornerShape(12.dp)).clickable(onClick = onInstall)
+                if (!batchMode && task.status == DlStatus.DONE) m.clip(RoundedCornerShape(12.dp)).clickable(onClick = onInstall)
                 else m
             },
         shape = RoundedCornerShape(12.dp),
         tonalElevation = 1.dp
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            modifier = Modifier
+                .padding(horizontal = 12.dp, vertical = 10.dp)
+                .then(
+                    if (batchMode) Modifier.clip(RoundedCornerShape(12.dp)).clickable(onClick = onToggle)
+                    else Modifier
+                ),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            if (batchMode) {
+                // 批量选择框
+                Box(
+                    modifier = Modifier
+                        .size(22.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(
+                            if (checked) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.surfaceVariant
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (checked) {
+                        Icon(
+                            Icons.Default.Check,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+                Spacer(Modifier.width(12.dp))
+            }
             Box(modifier = Modifier.size(44.dp), contentAlignment = Alignment.Center) {
                 Box(
                     modifier = Modifier
@@ -181,12 +334,14 @@ private fun DownloadTaskRow(
                     Icon(Icons.Default.Refresh, contentDescription = "重试", tint = MaterialTheme.colorScheme.primary)
                 }
                 DlStatus.DONE -> Row(verticalAlignment = Alignment.CenterVertically) {
-                    androidx.compose.material3.OutlinedButton(
-                        onClick = onInstall,
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                        modifier = Modifier.height(32.dp)
-                    ) {
-                        Text("安装", style = MaterialTheme.typography.labelMedium)
+                    if (!batchMode) {
+                        androidx.compose.material3.OutlinedButton(
+                            onClick = onInstall,
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                            modifier = Modifier.height(32.dp)
+                        ) {
+                            Text("安装", style = MaterialTheme.typography.labelMedium)
+                        }
                     }
                     IconButton(onClick = onDelete) {
                         Icon(Icons.Default.Delete, contentDescription = "删除记录", tint = MaterialTheme.colorScheme.outline)

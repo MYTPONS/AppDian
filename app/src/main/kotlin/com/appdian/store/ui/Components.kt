@@ -24,6 +24,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.appdian.engine.model.AppItem
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 
 /** 应用卡片：图标 + 名称 + 版本/包名 + 摘要，点击进入详情 */
 @Composable
@@ -33,6 +37,8 @@ fun AppItemCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // 图标加载失败时回退首字母，避免空白块
+    var iconFailed by remember(item.icon) { mutableStateOf(false) }
     Surface(
         modifier = modifier
             .fillMaxWidth()
@@ -52,11 +58,12 @@ fun AppItemCard(
                     .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center
             ) {
-                if (item.icon != null) {
+                if (item.icon != null && !iconFailed) {
                     AsyncImage(
                         model = item.icon,
                         contentDescription = item.name,
-                        modifier = Modifier.size(48.dp)
+                        modifier = Modifier.size(48.dp),
+                        onError = { iconFailed = true }
                     )
                 } else {
                     Text(
