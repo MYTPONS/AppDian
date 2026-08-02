@@ -127,6 +127,24 @@ class StoreRepository(
         /** 同名同版本去重键（本地 + 在线搜索结果合并时用） */
         fun dedupKey(item: AppItem): String =
             (item.name.trim().lowercase() + "|" + (item.version?.trim() ?: "")).lowercase()
+
+        /**
+         * 搜索结果分组合并：同一应用源只保留一个 group（本地发现缓存多栏目 + 在线搜索合并），
+         * 避免重复 sourceName 导致列表 key 冲突崩溃。items 按 名称+版本 去重。
+         * @param existing 已存在的同源 group（可能是本地缓存 group）
+         * @param preferOnlineTitle 合并时优先采用在线 group 的标题
+         */
+        fun mergeSameSourceGroup(
+            existing: GroupResult?,
+            g: GroupResult,
+            kept: List<AppItem>,
+            preferOnlineTitle: Boolean
+        ): GroupResult {
+            if (existing == null) return g.copy(items = kept)
+            val all = (existing.items + kept).distinctBy { dedupKey(it) }
+            val base = if (preferOnlineTitle) g else existing
+            return base.copy(items = all)
+        }
     }
 
     /** 发现页（一次性）：所有启用源的所有发现栏目（并发，缓存优先） */

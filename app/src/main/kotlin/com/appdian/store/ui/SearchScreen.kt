@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
@@ -100,12 +101,12 @@ fun SearchScreen(
                             }
                         }
                     }
-                    ui.groups.forEach { group ->
-                        item(key = "h-${group.source.sourceName}") {
+                    ui.groups.forEachIndexed { gi, group ->
+                        item(key = "h-$gi-${group.source.sourceName}") {
                             GroupHeader(group.source.sourceName)
                         }
                         if (group.error != null) {
-                            item(key = "e-${group.source.sourceName}") {
+                            item(key = "e-$gi-${group.source.sourceName}") {
                                 Text(
                                     "加载失败：${group.error}",
                                     style = MaterialTheme.typography.bodySmall,
@@ -114,14 +115,14 @@ fun SearchScreen(
                                 )
                             }
                         }
-                        items(group.items, key = { "i-${group.source.sourceName}-${it.name}-${it.packageName}-${it.detailUrl}-${it.version}" }) { item ->
+                        itemsIndexed(group.items, key = { ii, item -> "i-$gi-$ii-${item.name}-${item.packageName}-${item.detailUrl}-${item.version}" }) { _, item ->
                             AppItemCard(
                                 item = item,
                                 sourceName = group.source.sourceName,
                                 onClick = { onOpenDetail(group.source.sourceName, item) }
                             )
                         }
-                        item(key = "d-${group.source.sourceName}") {
+                        item(key = "d-$gi-${group.source.sourceName}") {
                             SectionSpacer()
                             HorizontalDivider()
                         }

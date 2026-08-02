@@ -109,25 +109,27 @@ class SearchViewModel(private val repo: StoreRepository) : ViewModel() {
         if (q.isBlank()) return
         viewModelScope.launch {
             _ui.value = SearchUiState(query = q, searching = true)
-            val groups = mutableListOf<GroupResult>()
+            // 同一应用源只保留一个 group（本地发现缓存的多栏目 + 在线搜索合并），
+            // 避免重复 sourceName 导致列表 key 冲突崩溃，也避免搜索结果里同一源出现多块
+            val groups = LinkedHashMap<String, GroupResult>()
             val seen = HashSet<String>()
 
             // 1. 本地缓存匹配（发现页已加载的数据，立即展示）
             repo.localMatches(q).forEach { g ->
                 val kept = g.items.filter { seen.add(com.appdian.store.data.StoreRepository.dedupKey(it)) }
                 if (kept.isNotEmpty()) {
-                    groups.add(g.copy(items = kept))
-                    _ui.value = SearchUiState(query = q, searching = true, groups = groups.toList(), searched = true)
+                    groups[g.source.sourceName] = com.appdian.store.data.StoreRepository.mergeSameSourceGroup(groups[g.source.sourceName], g, kept, preferOnlineTitle = false)
+                    _ui.value = SearchUiState(query = q, searching = true, groups = groups.values.toList(), searched = true)
                 }
             }
 
             // 2. 在线搜索（缓存优先，结果与本地去重）
             repo.searchFlow(q).collect { g ->
                 val kept = g.items.filter { seen.add(com.appdian.store.data.StoreRepository.dedupKey(it)) }
-                groups.add(g.copy(items = kept))
-                _ui.value = SearchUiState(query = q, searching = true, groups = groups.toList(), searched = true)
+                groups[g.source.sourceName] = com.appdian.store.data.StoreRepository.mergeSameSourceGroup(groups[g.source.sourceName], g, kept, preferOnlineTitle = true)
+                _ui.value = SearchUiState(query = q, searching = true, groups = groups.values.toList(), searched = true)
             }
-            _ui.value = SearchUiState(query = q, searching = false, groups = groups, searched = true)
+            _ui.value = SearchUiState(query = q, searching = false, groups = groups.values.toList(), searched = true)
         }
     }
 }
