@@ -230,11 +230,11 @@ private fun DetailContent(
             }
         }
 
-        // 版本选择：同源/跨源同名应用存在多个版本时展示，默认选版本最高的
-        if (versions.size > 1) {
+        // 版本：聚合到多个版本时显示切换 chips；单个版本也显示出来（功能可见）
+        if (versions.isNotEmpty()) {
             Column(modifier = Modifier.padding(top = 12.dp)) {
                 Text(
-                    "共 ${versions.size} 个版本",
+                    if (versions.size > 1) "共 ${versions.size} 个版本" else "版本",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -254,12 +254,14 @@ private fun DetailContent(
                         )
                     }
                 }
-                Text(
-                    "默认显示版本最高的，可点选其他版本下载",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.outline,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
+                if (versions.size > 1) {
+                    Text(
+                        "默认显示版本最高的，可点选其他版本下载",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
             }
         }
 

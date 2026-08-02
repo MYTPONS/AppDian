@@ -167,9 +167,10 @@ class DetailViewModel(
         listCategoryId = categoryRepo.classifier().classify(item, source)
         _ui.value = DetailUiState(loading = true, item = item, source = source)
         viewModelScope.launch {
-            // 1. 先抓当前条目详情（快速显示）
+            // 1. 先抓当前条目详情（快速显示）；详情没抓到图标时回退用列表条目图标
             val detailItem = runCatching { repo.detail(source, item) }.getOrDefault(item)
-            // 2. 聚合同名应用的所有版本（后台，失败静默）
+                .let { d -> if (d.icon.isNullOrBlank()) d.copy(icon = item.icon) else d }
+            // 2. 聚合同名应用的所有版本（后台，失败静默）；至少保留当前条目这一个版本
             val versions = runCatching {
                 com.appdian.store.data.VersionAggregator.aggregate(
                     item.name,
@@ -177,18 +178,36 @@ class DetailViewModel(
                     source.sourceName
                 )
             }.getOrDefault(emptyList())
+            val finalVersions = ensureCurrentVersion(versions, item, source)
             // 3. 默认显示最高版本：最高版本不是当前条目时切过去
-            val best = versions.firstOrNull()
+            val best = finalVersions.firstOrNull()
             if (best != null && !sameVersion(best.version, detailItem.version)) {
-                loadVersion(best, versions)
+                loadVersion(best, finalVersions)
             } else {
                 _ui.value = DetailUiState(
                     loading = false, item = detailItem, source = source,
-                    versions = versions, activeVersion = detailItem.version
+                    versions = finalVersions, activeVersion = detailItem.version
                 )
             }
         }
     }
+
+    /** 详情条目缺少图标/摘要时，回退用列表条目的字段 */
+    private fun mergeListFields(detail: AppItem, list: AppItem): AppItem {
+        var d = detail
+        if (d.icon.isNullOrBlank()) d = d.copy(icon = list.icon)
+        if (d.summary.isNullOrBlank()) d = d.copy(summary = list.summary)
+        return d
+    }
+
+    /** 聚合结果为空或没包含当前条目时，把当前条目加进去，保证版本区始终可见 */
+    private fun ensureCurrentVersion(
+        versions: List<VersionEntry>,
+        item: AppItem,
+        source: AppSource
+    ): List<VersionEntry> =
+        if (versions.any { sameVersion(it.version, item.version) }) versions
+        else versions + VersionEntry(item.version, item, source)
 
     /** 用户点版本选择器切换到某版本：抓该版本条目的详情并展示 */
     fun selectVersion(version: String) {
@@ -198,6 +217,7 @@ class DetailViewModel(
         _ui.value = st.copy(loading = true)
         viewModelScope.launch {
             val detailItem = runCatching { repo.detail(entry.source, entry.item) }.getOrDefault(entry.item)
+                .let { d -> mergeListFields(d, entry.item) }
             // 分类以该版本列表条目判定为准
             listCategoryId = categoryRepo.classifier().classify(entry.item, entry.source)
             _ui.value = st.copy(loading = false, item = detailItem, source = entry.source, activeVersion = entry.version)
@@ -206,6 +226,7 @@ class DetailViewModel(
 
     private suspend fun loadVersion(entry: VersionEntry, versions: List<VersionEntry>) {
         val detailItem = runCatching { repo.detail(entry.source, entry.item) }.getOrDefault(entry.item)
+            .let { d -> mergeListFields(d, entry.item) }
         listCategoryId = categoryRepo.classifier().classify(entry.item, entry.source)
         _ui.value = DetailUiState(
             loading = false, item = detailItem, source = entry.source,
