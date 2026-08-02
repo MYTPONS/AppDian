@@ -1,0 +1,25 @@
+{
+  "sourceName": "GitHub Web 示例",
+  "sourceUrl": "https://github.com",
+  "sourceVersion": "1.0.0",
+  "sourceIcon": "https://github.githubassets.com/favicons/favicon.svg",
+  "userAgent": "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36",
+  "discovery": [
+    {
+      "title": "Legado Releases 网页版（css 示例，结构变动可能失效）",
+      "category": "edu",
+      "section": {
+        "url": "/gedoor/legado/releases",
+        "listRule": "css:div.Box-row",
+        "itemRules": {
+          "name": "css:a.Link--primary@text",
+          "version": "regex:([0-9]+\\.[0-9]+\\.[0-9]+)",
+          "detailUrl": "css:a.Link--primary@attr:href",
+          "downloadUrl": "css:details a.Link--primary@attr:href || css:a[href$=.apk]@attr:href",
+          "downloadName": "regex:([^/]+\\.apk)",
+          "icon": "text:https://github.githubassets.com/favicons/favicon.svg"
+        }
+      }
+    }
+  ]
+}

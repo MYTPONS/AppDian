@@ -1,0 +1,15 @@
+.gradle/
+build/
+local.properties
+.idea/
+*.iml
+.DS_Store
+captures/
+.externalNativeBuild/
+.cxx/
+
+# release 签名（勿提交）
+keystore/
+# 本地构建产物 APK（release 在 app/build/outputs/ 下，此处不重复提交）
+appdian-release.apk
+.kotlin/

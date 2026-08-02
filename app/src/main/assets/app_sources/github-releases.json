@@ -1,0 +1,72 @@
+{
+  "sourceName": "GitHub Releases",
+  "sourceUrl": "https://api.github.com",
+  "sourceVersion": "1.1.0",
+  "sourceIcon": "https://github.githubassets.com/favicons/favicon.svg",
+  "userAgent": "AppDian/0.1 (AppStore-Source-Engine)",
+  "search": {
+    "url": "/search/repositories?q={{key}}+topic:android&sort=stars&per_page=15",
+    "listRule": "json:$.items",
+    "itemRules": {
+      "name": "json:full_name",
+      "summary": "json:description",
+      "icon": "json:owner.avatar_url",
+      "extras": {
+        "full_name": "json:full_name"
+      },
+      "detailUrl": "{{sourceUrl}}/repos/{{full_name}}/releases/latest"
+    }
+  },
+  "detail": {
+    "url": "/repos/{{full_name}}/releases/latest",
+    "itemRules": {
+      "name": "json:$.assets[0].name",
+      "version": "json:$.tag_name",
+      "summary": "json:$.name",
+      "downloadName": "json:$.assets[0].name",
+      "downloadUrl": "json:$.assets[0].browser_download_url",
+      "downloadSize": "json:$.assets[0].size",
+      "icon": "text:https://github.githubassets.com/favicons/favicon.svg"
+    }
+  },
+  "discovery": [
+    {
+      "title": "NetGuard 最新发布",
+      "category": "security",
+      "section": {
+        "url": "/repos/M66B/NetGuard/releases/latest",
+        "listRule": "json:$.assets",
+        "itemRules": {
+          "name": "json:name",
+          "downloadName": "json:name",
+          "downloadUrl": "json:browser_download_url",
+          "downloadSize": "json:size",
+          "icon": "text:https://github.githubassets.com/favicons/favicon.svg",
+          "detailUrl": "{{sourceUrl}}/repos/{{full_name}}/releases/latest",
+          "extras": {
+            "full_name": "text:M66B/NetGuard"
+          }
+        }
+      }
+    },
+    {
+      "title": "Termux 最新发布",
+      "category": "dev",
+      "section": {
+        "url": "/repos/termux/termux-app/releases/latest",
+        "listRule": "json:$.assets",
+        "itemRules": {
+          "name": "json:name",
+          "downloadName": "json:name",
+          "downloadUrl": "json:browser_download_url",
+          "downloadSize": "json:size",
+          "icon": "text:https://github.githubassets.com/favicons/favicon.svg",
+          "detailUrl": "{{sourceUrl}}/repos/{{full_name}}/releases/latest",
+          "extras": {
+            "full_name": "text:termux/termux-app"
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,73 @@
+{
+  "sourceName": "华军软件园",
+  "sourceUrl": "https://www.onlinedown.net",
+  "sourceVersion": "1.0.0",
+  "sourceIcon": "https://www.onlinedown.net/favicon.ico",
+  "userAgent": "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
+  "headers": {
+    "Referer": "https://www.onlinedown.net/"
+  },
+  "search": {
+    "url": "/search?searchname={{key}}&type=soft&searchsid=android",
+    "listRule": "css:ul.m-list2 li.item",
+    "itemRules": {
+      "name": "css:.tt@text",
+      "icon": "css:.img-box img@attr:src",
+      "summary": "css:.intro@text",
+      "detailUrl": "css:.tt@attr:href",
+      "downloadSize": "css:p span:nth-of-type(2)@ownText => regex:大小[：:]\\s*(.+)",
+      "lastUpdate": "css:p span:nth-of-type(3)@ownText"
+    }
+  },
+  "detail": {
+    "url": "{{detailUrl}}",
+    "itemRules": {
+      "name": "css:h1@text => regex:^(.+?)\\s+[\\d.]+$ || css:h1@text",
+      "version": "css:h1@text => regex:([\\d.]+)$",
+      "icon": "css:.img-txt-box img@attr:src || css:.img-txt-box img@attr:preview",
+      "description": "css:.img-txt-box .text@text || css:#ItemRJJS .img-txt-box@text",
+      "downloadName": "css:a.qrcode_show@attr:onclick => regex:([^/]+\\.apk)",
+      "downloadUrl": "css:a.qrcode_show@attr:onclick => regex:https://[^`]+\\.apk[^`]* || css:a.qrcode_show@attr:href => regex:^\\S+",
+      "downloadSize": "regex:软件大小[：:]\\s*([0-9.]+(?:MB|KB|GB|M|K))",
+      "lastUpdate": "regex:更新(?:日期|时间)[：:]\\s*([0-9-]{10})"
+    }
+  },
+  "discovery": [
+    {
+      "title": "本周热推",
+      "section": {
+        "url": "/android/",
+        "listRule": "css:ul.m-sw-list li.item",
+        "itemRules": {
+          "name": "css:a.txt@text",
+          "icon": "css:img@attr:src",
+          "detailUrl": "css:a.txt@attr:href"
+        }
+      }
+    },
+    {
+      "title": "热门榜单（最受欢迎 / 最近更新）",
+      "section": {
+        "url": "/android/",
+        "listRule": "css:ul.m-sw-list2 li.item:has(a[href*='/soft/'])",
+        "itemRules": {
+          "name": "css:.tt@text",
+          "icon": "css:img@attr:src",
+          "detailUrl": "css:.tt@attr:href"
+        }
+      }
+    },
+    {
+      "title": "安卓分类推荐",
+      "category": "edu",
+      "section": {
+        "url": "/android/",
+        "listRule": "css:.g-box.m-rec a[href*='/soft/']",
+        "itemRules": {
+          "name": "css:a@text",
+          "detailUrl": "css:a@attr:href"
+        }
+      }
+    }
+  ]
+}

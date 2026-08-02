@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Android 9- 下载到公共 Download/应用大典 目录，安装时经 FileProvider 暴露 -->
+    <external-path
+        name="downloads"
+        path="Download/应用大典/" />
+    <external-path
+        name="download_root"
+        path="Download/" />
+    <!-- 安装前复制到 cacheDir/install 的场景（分区存储 Android 10+） -->
+    <cache-path
+        name="install_cache"
+        path="install/" />
+</paths>

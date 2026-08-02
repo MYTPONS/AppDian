@@ -1,0 +1,53 @@
+{
+  "sourceName": "F-Droid",
+  "sourceUrl": "https://f-droid.org",
+  "sourceVersion": "1.0.0",
+  "sourceIcon": "https://f-droid.org/favicon.ico",
+  "userAgent": "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36",
+  "search": {
+    "url": "/api/v1/search?q={{key}}&lang=zh",
+    "listRule": "json:$.packages",
+    "itemRules": {
+      "name": "json:name",
+      "packageName": "json:packageName",
+      "summary": "json:summary",
+      "category": "json:categories[0]",
+      "icon": "json:icon => {{sourceUrl}}/repo/{{this}}",
+      "detailUrl": "{{sourceUrl}}/api/v1/packages/{{packageName}}"
+    }
+  },
+  "detail": {
+    "url": "/api/v1/packages/{{packageName}}",
+    "itemRules": {
+      "name": "json:$.name",
+      "packageName": "json:$.packageName",
+      "summary": "json:$.summary",
+      "description": "json:$.description",
+      "category": "json:$.categories[0]",
+      "icon": "json:$.icon => {{sourceUrl}}/repo/{{this}}",
+      "version": "json:$.suggestedVersionName || json:$.packages[0].versionName",
+      "lastUpdate": "json:$.packages[0].added",
+      "developer": "json:$.authorName",
+      "downloadName": "json:$.packages[0].apkName",
+      "downloadUrl": "{{sourceUrl}}/repo/{{downloadName}}",
+      "downloadSize": "json:$.packages[0].size"
+    }
+  },
+  "discovery": [
+    {
+      "title": "最新收录",
+      "section": {
+        "url": "/api/v1/packages/",
+        "listRule": "json:$.*",
+        "itemRules": {
+          "name": "json:name",
+          "packageName": "json:packageName",
+          "summary": "json:summary",
+          "category": "json:categories[0]",
+          "icon": "json:icon => {{sourceUrl}}/repo/{{this}}",
+          "detailUrl": "{{sourceUrl}}/api/v1/packages/{{packageName}}"
+        }
+      }
+    }
+  ]
+}
