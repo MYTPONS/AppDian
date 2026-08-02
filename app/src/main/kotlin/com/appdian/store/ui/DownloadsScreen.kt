@@ -1,4 +1,5 @@
 package com.appdian.store.ui
+import android.widget.Toast
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -203,13 +204,20 @@ fun DownloadsScreen(
             confirmButton = {
                 if (hasFile) {
                     TextButton(onClick = {
-                        viewModel.removeAll(p.ids, deleteFile = true)
+                        val deleted = viewModel.removeAll(p.ids, deleteFile = true)
                         pendingDelete = null
+                        Toast.makeText(
+                            context,
+                            if (deleted > 0) "已删除记录，同时删除 $deleted 个下载文件"
+                            else "已删除记录（未找到对应文件）",
+                            Toast.LENGTH_SHORT
+                        ).show()
                     }) { Text("同时删除文件", color = MaterialTheme.colorScheme.error) }
                 }
                 TextButton(onClick = {
                     viewModel.removeAll(p.ids, deleteFile = false)
                     pendingDelete = null
+                    Toast.makeText(context, "已删除记录", Toast.LENGTH_SHORT).show()
                 }) { Text(if (hasFile) "仅删除记录" else "删除") }
             },
             dismissButton = {

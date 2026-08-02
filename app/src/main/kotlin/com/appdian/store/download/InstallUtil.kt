@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
 import android.provider.MediaStore
 import androidx.core.content.FileProvider
 import java.io.File
@@ -69,17 +70,27 @@ object InstallUtil {
         }
         context.contentResolver.query(
             collection,
-            arrayOf(MediaStore.MediaColumns.DATA),
-            "${MediaStore.MediaColumns.DISPLAY_NAME}=?",
-            arrayOf(displayName),
+            arrayOf(MediaStore.MediaColumns.DATA, MediaStore.MediaColumns.DISPLAY_NAME),
+            "${MediaStore.MediaColumns.RELATIVE_PATH}=?",
+            arrayOf(Environment.DIRECTORY_DOWNLOADS + "/应用大典"),
             null
         )?.use { c ->
-            if (c.moveToFirst()) {
-                val data = c.getString(0)
-                if (!data.isNullOrBlank()) return File(data)
+            while (c.moveToNext()) {
+                val name = c.getString(1)
+                if (name != null && (name == displayName || isRenamedVariant(name, displayName))) {
+                    val data = c.getString(0)
+                    if (!data.isNullOrBlank()) return File(data)
+                }
             }
         }
         return null
+    }
+
+    /** 系统冲突改名变体：微信.apk → 微信(1).apk */
+    private fun isRenamedVariant(name: String, original: String): Boolean {
+        val stem = original.substringBeforeLast('.')
+        val ext = original.substringAfterLast('.', "")
+        return name.startsWith("$stem(") && name.endsWith(if (ext.isEmpty()) "" else ".$ext")
     }
 
     /** 是否还支持安装：任务已完成 */

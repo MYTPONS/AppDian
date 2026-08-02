@@ -1,5 +1,6 @@
 package com.appdian.store.download
 
+import android.content.ContentUris
 import android.content.Context
 import android.os.Environment
 import android.os.Build
@@ -124,29 +125,63 @@ object DownloadHub {
         persist()
     }
 
-    /** 批量删除任务记录；[deleteFile] 时同时删除各自已下载的文件 */
-    fun removeAll(ids: List<Long>, deleteFile: Boolean = false) {
+    /** 批量删除任务记录；[deleteFile] 时同时删除各自已下载的文件。返回实际删除的文件数 */
+    fun removeAll(ids: List<Long>, deleteFile: Boolean = false): Int {
         val targets = _tasks.value.filter { it.id in ids }
         ids.forEach { running.remove(it)?.cancel() }
         _tasks.value = _tasks.value.filterNot { it.id in ids }
-        if (deleteFile) targets.forEach { deleteLocalFile(it) }
+        val deleted = if (deleteFile) targets.count { deleteLocalFile(it) } else 0
         persist()
+        return deleted
     }
 
-    /** 删除任务对应的本地已下载文件（API29+ 走 MediaStore，低版本走文件路径） */
-    fun deleteLocalFile(task: DownloadTask) {
-        val path = task.localPath ?: return
-        val ctx = appContext ?: return
+    /**
+     * 删除任务对应的本地已下载文件（API29+ 走 MediaStore，低版本走文件路径）。
+     * 返回是否真的删除了文件。
+     *
+     * 注意：MediaStore 在下载目录遇到同名文件时会自动改名（如 微信.apk → 微信(1).apk），
+     * 精确按 DISPLAY_NAME 匹配会漏删，因此按 目录 + 文件名前缀变体 模糊匹配后全部删除。
+     */
+    fun deleteLocalFile(task: DownloadTask): Boolean {
+        val path = task.localPath ?: return false
+        val ctx = appContext ?: return false
         if (Build.VERSION.SDK_INT >= 29) {
-            // localPath 保存的是 MediaStore 的 displayName
-            ctx.contentResolver.delete(
+            val rel = Environment.DIRECTORY_DOWNLOADS + "/应用大典"
+            val ids = mutableListOf<Long>()
+            ctx.contentResolver.query(
                 MediaStore.Downloads.EXTERNAL_CONTENT_URI,
-                "${MediaStore.MediaColumns.DISPLAY_NAME}=? AND ${MediaStore.MediaColumns.RELATIVE_PATH}=?",
-                arrayOf(path, Environment.DIRECTORY_DOWNLOADS + "/应用大典")
-            )
+                arrayOf(MediaStore.MediaColumns._ID, MediaStore.MediaColumns.DISPLAY_NAME),
+                "${MediaStore.MediaColumns.RELATIVE_PATH}=?",
+                arrayOf(rel),
+                null
+            )?.use { c ->
+                while (c.moveToNext()) {
+                    val name = c.getString(1) ?: continue
+                    if (sameMediaName(name, path)) ids.add(c.getLong(0))
+                }
+            }
+            var deleted = 0
+            ids.forEach { id ->
+                deleted += ctx.contentResolver.delete(
+                    ContentUris.withAppendedId(MediaStore.Downloads.EXTERNAL_CONTENT_URI, id),
+                    null, null
+                )
+            }
+            return deleted > 0
         } else {
-            runCatching { File(path).delete() }
+            return runCatching { File(path).delete() }.getOrDefault(false)
         }
+    }
+
+    /**
+     * 判断 MediaStore 里的文件名是否对应同一个下载文件：
+     * 精确同名，或系统冲突改名变体（微信.apk → 微信(1).apk）。
+     */
+    private fun sameMediaName(name: String, path: String): Boolean {
+        if (name == path) return true
+        val stem = path.substringBeforeLast('.')
+        val ext = path.substringAfterLast('.', "")
+        return name.startsWith("$stem(") && name.endsWith(if (ext.isEmpty()) "" else ".$ext")
     }
 
     /** 换源重试：更新任务（换 URL/Referer 等）后重新入队，进度清零 */

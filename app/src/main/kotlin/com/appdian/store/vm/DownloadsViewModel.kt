@@ -21,8 +21,8 @@ class DownloadsViewModel : ViewModel() {
     /** 删除任务记录；[deleteFile] 时同时删除已下载的本地文件 */
     fun remove(id: Long, deleteFile: Boolean = false) = DownloadHub.remove(id, deleteFile)
 
-    /** 批量删除；[deleteFile] 时同时删除各自已下载的本地文件 */
-    fun removeAll(ids: List<Long>, deleteFile: Boolean = false) = DownloadHub.removeAll(ids, deleteFile)
+    /** 批量删除；[deleteFile] 时同时删除各自已下载的本地文件。返回实际删除的文件数 */
+    fun removeAll(ids: List<Long>, deleteFile: Boolean = false): Int = DownloadHub.removeAll(ids, deleteFile)
 
     /** 批量取消（不影响已下载文件） */
     fun cancelAll(ids: List<Long>) = ids.forEach { DownloadHub.cancel(it) }
