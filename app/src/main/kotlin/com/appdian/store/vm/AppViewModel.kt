@@ -201,16 +201,21 @@ class DetailViewModel(
         return detail.copy(icon = icon, summary = summary)
     }
 
-    /** 聚合结果没包含当前真实版本时，用详情抓到的版本补一个条目（不显示“未知版本”） */
+    /**
+     * 修正聚合结果：
+     * 1) 过滤掉没版本号的条目（通常是列表规则未提取版本，与真实版本重复，避免“未知版本”占位）
+     * 2) 仍没包含当前真实版本时，用详情抓到的版本补一个条目
+     */
     private fun ensureContains(
         versions: List<VersionEntry>,
         version: String?,
         item: AppItem,
         source: AppSource
     ): List<VersionEntry> {
-        if (version.isNullOrBlank()) return versions
-        return if (versions.any { sameVersion(it.version, version) }) versions
-        else versions + VersionEntry(version, item, source)
+        val cleaned = versions.filter { !it.version.isNullOrBlank() }
+        if (version.isNullOrBlank()) return cleaned
+        return if (cleaned.any { sameVersion(it.version, version) }) cleaned
+        else cleaned + VersionEntry(version, item, source)
     }
 
     /** 用户点版本选择器切换到某版本：抓该版本条目的详情并展示 */
