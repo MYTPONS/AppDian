@@ -250,16 +250,21 @@ fun BatchCategorizeScreen(
     }
 }
 
-/** 多选状态 */
+/** 单条应用的稳定键：源名 + itemKey + 详情地址，避免因刷新/筛选重建对象导致引用失效 */
+private fun stableKey(e: CategorizedEntry): String =
+    CategoryClassifier.itemKey(e.source.sourceName, e.item) + "|" + (e.item.detailUrl ?: "")
+
+/** 多选状态，用稳定键判勾选（不依赖对象引用） */
 private class SelectedState {
     private val _keys = MutableStateFlow<List<CategorizedEntry>>(emptyList())
     val keysFlow: StateFlow<List<CategorizedEntry>> = _keys.asStateFlow()
     var showPicker by mutableStateOf(false)
 
     fun toggle(e: CategorizedEntry) {
-        _keys.update { l -> if (l.any { it === e }) l.filterNot { it === e } else l + e }
+        val sk = stableKey(e)
+        _keys.update { l -> if (l.any { stableKey(it) == sk }) l.filterNot { stableKey(it) == sk } else l + e }
     }
-    fun isSelected(e: CategorizedEntry): Boolean = _keys.value.any { it === e }
+    fun isSelected(e: CategorizedEntry): Boolean = stableKey(e) in _keys.value.map { stableKey(it) }
     fun count(): Int = _keys.value.size
     fun keys(): List<CategorizedEntry> = _keys.value
     fun clear() { _keys.value = emptyList() }

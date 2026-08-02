@@ -100,10 +100,15 @@ private fun AppRoot() {
         }
     }
 
+    // 这些子页面自带功能栏/返回，不显示底部主导航（避免两套功能栏重叠）
+    val hideBottomNav = currentRoute in setOf(
+        "detail", "sourceManage", "batchCategorize", "categoryManage", "about"
+    )
+
     Scaffold(
         bottomBar = {
-            if (currentRoute == "detail") {
-                // 详情页不显示底部导航
+            if (hideBottomNav) {
+                // 子页面不显示底部导航
             } else {
                 NavigationBar {
                     tabs.forEach { tab ->
