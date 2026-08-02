@@ -35,6 +35,8 @@ class AppViewModelFactory(private val app: AppDianApp) : ViewModelProvider.Facto
             SettingsViewModel(app.categoryRepository, app.settingsStore) as T
         modelClass.isAssignableFrom(DownloadsViewModel::class.java) ->
             DownloadsViewModel() as T
+        modelClass.isAssignableFrom(UpdateViewModel::class.java) ->
+            UpdateViewModel(com.appdian.store.data.UpdateChecker()) as T
         else -> throw IllegalArgumentException("unknown VM: ${modelClass.name}")
     }
 }
