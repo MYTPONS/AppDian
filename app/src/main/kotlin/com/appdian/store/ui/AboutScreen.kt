@@ -93,7 +93,7 @@ fun AboutScreen(
             item { AboutSection("项目介绍") }
             item {
                 AboutCard(
-                    text = "应用大典（AppDian）是一个仿照 legado（阅读）书源机制自研的 Android 应用软件库。\n\n" +
+                    text = "应用大典（AppDian）是一个仿照 legado（阅读）书源机制的 Android 应用软件库。\n\n" +
                         "不依赖任何固定的应用商店：应用源（AppSource）是一份 JSON 规则文件，描述如何从任意网站解析应用列表、详情和下载地址。\n\n" +
                         "用户自由导入 / 分享源，绕开搜索引擎里铺天盖地的病毒和伪站，直达可信来源。"
                 )
@@ -125,7 +125,7 @@ fun AboutScreen(
             item { AboutSection("功能特性") }
             item {
                 AboutCard(
-                    text = "- 规则引擎：css / json / regex / text 规则、|| 回退、模板变量、自研轻量 JsonPath\n" +
+                    text = "- 规则引擎：css / json / regex / text 规则、|| 回退、模板变量、轻量 JsonPath\n" +
                         "- 发现 / 搜索 / 详情：多源并发、增量上屏、数据缓存复用\n" +
                         "- 分类：关键词智能归类 + 手动归类 + 批量归类\n" +
                         "- 下载管理器：前台服务下载、通知进度、失败自动换源换链接\n" +

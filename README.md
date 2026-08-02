@@ -4,12 +4,12 @@
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.0-purple.svg)](https://kotlinlang.org/)
 [![Android](https://img.shields.io/badge/Android-SDK%2035-green.svg)](https://developer.android.com/)
 
-仿照 **legado（阅读）书源机制** 自研的 Android 应用软件库壳子。
+仿照 **legado（阅读）书源机制** 的 Android 应用软件库壳子。
 不再依赖任何固定的应用商店：**应用源（AppSource）** 是一份 JSON 规则文件，
 描述如何从任意网站解析应用列表、详情和下载地址 —— 用户自由导入/分享源，
 绕开搜索引擎里铺天盖地的病毒/伪站，直达可信来源。
 
-> 已交付：核心规则引擎 + 源管理 + 发现/搜索/详情 + 分类 + **内置下载管理器**（自研 OkHttp 前台服务，失败自动换源/换链接）+ 数据复用缓存。
+> 已交付：核心规则引擎 + 源管理 + 发现/搜索/详情 + 分类 + **内置下载管理器**（OkHttp 前台服务，失败自动换源/换链接）+ 数据复用缓存。
 > 99 个单元测试全绿（`./gradlew :engine:test :app:testDebugUnitTest`）。
 
 ## 架构
@@ -18,13 +18,13 @@
 :engine  纯 Kotlin 规则引擎（无 Android 依赖，JVM 可测）
          ├─ model/AppSource.kt   源数据模型（JSON 序列化）
          ├─ RuleEngine.kt        规则求值：css / json / regex / text / || 回退 / @属性后缀
-         ├─ JsonPath.kt          自研轻量 JSONPath（$ .key [idx] [*]）
+         ├─ JsonPath.kt          轻量 JSONPath（$ .key [idx] [*]）
          ├─ Template.kt          {{变量}} 模板引擎
          └─ SourceParser.kt      区块解析：HTML/JSON 自动探测 → 条目字段提取 → URL 补全
 :app     Android 应用（Jetpack Compose + Material3 + MVVM + OkHttp + Coil）
          ├─ data/SourceRepository   源以 JSON 文件存放 filesDir/sources/，天然支持导入导出
          ├─ data/StoreRepository    业务编排：发现 / 搜索 / 详情
-         ├─ download/DownloadService  自研下载服务（前台服务 + 通知进度 + 归档公共下载目录）
+         ├─ download/DownloadService  下载服务（前台服务 + 通知进度 + 归档公共下载目录）
          └─ ui/                     发现 · 搜索 · 下载 · 详情 · 源管理
 ```
 
@@ -53,7 +53,7 @@ adb install app/build/outputs/apk/release/app-release.apk
 | 华军软件园 | HTML 源（真实反爬实战）：搜索 + 详情 + 发现，`headers` 带 Referer 过反爬，`=> regex:` 管道从 onclick 抠 APK 直链 / `iopdfbhjl` 跳转链接 |
 
 
-## 自研接入方式：应用源
+## 接入方式：应用源
 
 规则语法速览（详见 [`docs/应用源格式.md`](docs/应用源格式.md)）：
 
@@ -81,7 +81,7 @@ adb install app/build/outputs/apk/release/app-release.apk
 
 ## 下载管理
 
-详情页点「下载 APK」即开始下载（自研 OkHttp 前台服务）：
+详情页点「下载 APK」即开始下载（OkHttp 前台服务）：
 
 - 通知栏实时进度（可取消）
 - 「下载」tab 查看任务：进度 / 取消 / 失败重试 / 删除记录

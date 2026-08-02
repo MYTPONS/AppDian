@@ -8,7 +8,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 
 /**
- * 自研轻量 JSONPath 子集，用于 JSON 类型应用源的字段提取。
+ * 轻量 JSONPath 子集，用于 JSON 类型应用源的字段提取。
  *
  * 支持的语法：
  *  - $           根节点
