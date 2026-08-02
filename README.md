@@ -7,16 +7,35 @@
 
 用户可以自由导入 / 分享 / 维护这些源，绕过搜索引擎，直达可信来源——原理和 legado（阅读）的书源机制一致，只是把领域从**书**换成了**应用**。
 
-## 特性
+> 当前为**测试版**，功能持续迭代中。下载见下方「下载安装」。
 
-- **规则驱动**：`css` / `json` / `regex` 三种规则 + `||` 回退 + `{{模板}}` 变量，一份 JSON 同时描述列表、详情、下载地址
-- **多源聚合**：发现、搜索跨源并发执行，结果逐个上屏，慢源不拖累快源
-- **分类**：关键词匹配归类 + 手动 / 批量归类，跨源统一分类视图
-- **下载管理**：前台服务下载、通知栏进度、失败自动换源 / 换链接、完成后一键安装
-- **数据复用**：LRU 缓存池 + 下载中数据保护，重复浏览不重复抓取
-- **纯 Kotlin 规则引擎**：引擎无 Android 依赖，JVM 上可独立测试（107 个单测全绿）
+## 下载安装
+
+1. 打开 [Releases 页面](https://github.com/MYTPONS/AppDian/releases)（当前为测试版，带 Pre-release 标记）
+2. 下载 `appdian-release.apk`
+3. 安装后首次打开，会自动导入 4 个内置演示源，即可开始使用
+
+> 安装时如提示"未知来源"，允许安装即可。测试版可能存在问题，请谨慎使用。
+
+## 使用说明
+
+**浏览发现**：底部「发现」页展示各源的应用推荐；「分类」页按分类浏览跨源聚合的应用。
+
+**搜索应用**：底部「搜索」页输入名称（如"微信"），多个源同时搜索、结果逐个上屏。搜索结果会按名称 + 版本去重，并过滤掉名称和简介都不含关键词的结果。
+
+**查看详情**：点击结果进入详情页，可查看版本列表（同名多版本时默认显示最高版本，可点选其他版本）、简介、下载地址来源。
+
+**下载安装**：详情页点「下载 APK」开始下载（通知栏实时进度）；下载完成后点通知即可安装，或到「下载」页点击已完成的记录安装。某源下载失败时，会自动尝试该源的其他下载链接或其他源的同一应用。
+
+**管理应用源**：设置 → 源管理，可查看、启停、导入、删除应用源；支持分享源文件给他人。
+
+**分类归类**：设置 → 批量分类 / 分类管理，可批量把应用归入自定义分类（关键词匹配 + 手动归类，支持导入导出分类配置）。
+
+**其他设置**：设置页可修改全局 User-Agent、导出 / 导入分类配置、检查新版本、查看崩溃日志。
 
 ## 内置演示源
+
+首次启动自动导入 4 个演示源：
 
 | 源 | 说明 |
 |---|---|
@@ -25,64 +44,33 @@
 | 华军软件园 | 真实反爬实战：Referer 过校验 + 规则管道提取直链 |
 | GitHub Web 示例 | `css:` 规则抓网页的入门示例 |
 
-## 快速开始
+## 应用源（写给想自己写源 / 分享源的用户）
 
-```bash
-# 环境：JDK 17 + Android SDK（35）
-export JAVA_HOME=~/devtools/jdk17
-export ANDROID_HOME=~/devtools/android-sdk
-./gradlew :engine:test :app:testDebugUnitTest   # 107 个测试
-./gradlew :app:assembleDebug                    # debug APK
-./gradlew :app:assembleRelease                  # release 签名 APK
-adb install app/build/outputs/apk/release/app-release.apk
-```
-
-> 签名：release 使用 `keystore/appdian.jks`（已 gitignore，不提交）；凭据默认本地值，可通过环境变量 `APPDIAN_STORE_PASSWORD` / `APPDIAN_KEY_ALIAS` / `APPDIAN_KEY_PASSWORD` 覆盖。正式发布请换成自己的签名。
-
-## 应用源语法速览
-
-详见 [`docs/应用源格式.md`](docs/应用源格式.md)：
+应用源是一份 JSON 文件，描述"从哪里抓、怎么抓"。规则语法速览（完整规范见 [`docs/应用源格式.md`](docs/应用源格式.md)）：
 
 - `css:div.app-item@attr:href` — CSS 选择器 + 属性后缀
 - `json:$.packages[0].apkName` / `json:name` — JSONPath（条目内相对路径）
 - `regex:版本[:：]\s*([0-9.]+)` — 正则（默认取第 1 捕获组，`@2` 指定组号）
 - `规则A || 规则B` — 第一个非空结果生效
 - `{{key}} {{sourceUrl}} {{packageName}}` — 模板变量
-- `json:icon => {{sourceUrl}}/repo/{{this}}` — 提取结果二次转换
 - `extras: { "full_name": "json:full_name" }` — 任意中间变量
+
+在「源管理」页导入 JSON 即可使用，也可以把写好的源分享给其他人。
 
 ## 项目结构
 
 ```
 :engine  规则引擎（纯 Kotlin，无 Android 依赖）
-         ├─ model/AppSource.kt   源数据模型（JSON 序列化）
-         ├─ RuleEngine.kt        规则求值：css / json / regex / text / || 回退
-         ├─ JsonPath.kt          轻量 JSONPath（$ .key [idx] [*]）
-         ├─ Template.kt          {{变量}} 模板引擎
-         └─ SourceParser.kt      HTML/JSON 自动探测 → 字段提取 → URL 补全
-:app     Android 应用（Jetpack Compose + Material3 + MVVM + OkHttp + Coil）
-         ├─ data/SourceRepository   源以 JSON 存放 filesDir/sources/，天然支持导入导出
-         ├─ data/StoreRepository    发现 / 搜索 / 详情编排 + 缓存
-         ├─ download/DownloadService  前台服务下载，归档公共下载目录
-         └─ ui/                     发现 · 搜索 · 分类 · 下载 · 设置
-```
-
-## 目录
-
-```
-├── app/                     Android 应用
-│   └── src/main/assets/app_sources/   内置演示源
-├── engine/                  规则引擎（纯 Kotlin）
+:app     Android 应用（Compose UI + 数据层 + 下载服务）
+├── app/src/main/assets/app_sources/   内置演示源
 ├── docs/应用源格式.md        应用源完整规范
 └── artifacts/screenshots/   模拟器实拍截图
 ```
 
-## 开源协议
+## 许可证
 
 [MIT License](LICENSE) — 自由使用 / 修改 / 分发，注明出处即可。
 
-## 后续计划
+---
 
-- [ ] 下载断点续传（Range 续传）
-- [ ] 源分享生态（源市场 / 二维码导入 / 规则调试台）
-- [ ] xpath 规则支持、正则多行模式、请求 Cookie 管理
+*面向开发者的构建信息：JDK 17 + Android SDK 35，`./gradlew :engine:test :app:testDebugUnitTest`（测试）、`:app:assembleRelease`（打包）。*
