@@ -4,16 +4,8 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- 白底圆角卡片 + 蓝色放大镜 -->
-    <group>
-        <path
-            android:fillColor="#FFFFFF"
-            android:pathData="M32,32 h44 a8,8 0 0,1 8,8 v28 a8,8 0 0,1 -8,8 h-44 a8,8 0 0,1 -8,-8 v-28 a8,8 0 0,1 8,-8 z" />
-        <path
-            android:fillColor="#3B5BA5"
-            android:pathData="M46,46 m-11,0 a11,11 0 1,0 22,0 a11,11 0 1,0 -22,0 z" />
-        <path
-            android:fillColor="#3B5BA5"
-            android:pathData="M55,57 l11,11 l-4.5,4.5 l-11,-11 z" />
-    </group>
+    <!-- 透明前景：图标主体由 ic_launcher_background（应用 logo）铺满展示 -->
+    <path
+        android:fillColor="#00FFFFFF"
+        android:pathData="M0,0 h108 v108 h-108 z" />
 </vector>
